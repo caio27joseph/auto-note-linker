@@ -1,25 +1,114 @@
 import ANLPlugin from "main";
-import { Modal } from "obsidian";
+import { MarkdownView, Modal } from "obsidian";
 
+function escapeRegExp(string: string) {
+	return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
+}
 export interface MatchResult {
 	match: string;
 	before: string;
 	after: string;
+	line: number;
+	index: number;
 }
 
 export class FindNoteLinksModal extends Modal {
 	plugin: ANLPlugin;
 	results: MatchResult[];
-	filteredResults: MatchResult[]; // Store filtered results here
+	filteredResults: MatchResult[];
 	selectAllCheckbox: HTMLInputElement;
 	searchBar: HTMLInputElement;
+	checkboxMatchMap: Record<string, MatchResult>;
 
 	constructor(plugin: ANLPlugin, results: MatchResult[]) {
 		super(plugin.app);
 		this.plugin = plugin;
 		this.results = results;
-		this.filteredResults = results; // Initialize filteredResults with all results
+		this.filteredResults = results;
+		this.checkboxMatchMap = {};
 	}
+
+	linkAllSelected() {
+		let { contentEl } = this;
+		let checkboxes = contentEl.querySelectorAll<HTMLInputElement>(
+			".match-element .match-checkbox"
+		);
+
+		const activeMarkdownView =
+			this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+
+		if (activeMarkdownView) {
+			const editor = activeMarkdownView.editor;
+			const doc = editor.getDoc();
+
+			// We're going to create an array of the new contents for each line
+			let newLines: string[] = doc.getValue().split("\n");
+
+			checkboxes.forEach((checkbox) => {
+				const checkboxId = checkbox.title;
+				const match = this.checkboxMatchMap[checkboxId];
+				const isChecked = checkbox.checked;
+				if (match && isChecked) {
+					const linkFormat = `[[${match.match}]]`;
+
+					let lineText = newLines[match.line - 1]; // We get the line from our new array, not the document
+
+					// We make a special regex that matches the spaces before, the match, and the spaces after
+					let regex = new RegExp(
+						`(${match.before}\\s*)(\\b${match.match}\\b)(\\s*${match.after})`,
+						"g"
+					);
+
+					// Replace the match with the link format while preserving the original spaces
+					lineText = lineText.replace(regex, `$1${linkFormat}$3`);
+
+					newLines[match.line - 1] = lineText; // We update the line in our array, not the document
+				}
+			});
+
+			// Now we replace the entire document with our new lines
+			doc.setValue(newLines.join("\n"));
+
+			// Close the modal
+			this.close();
+		}
+	}
+
+	renderMatch(containerEl: HTMLElement, match: MatchResult, index: number) {
+		// Create a div for the entire match element
+		let matchEl = containerEl.createDiv({
+			cls: "match-element",
+		});
+
+		// Create a checkbox with a unique ID
+		const title = `checkbox-${Date.now()}-${index}`; // Generate a unique ID based on the current timestamp and the index
+		let checkbox = matchEl.createEl("input", {
+			type: "checkbox",
+			cls: "match-checkbox",
+			title,
+		}) as HTMLInputElement;
+
+		// Add the checkbox index and its state to the checkboxIdMap
+		this.checkboxMatchMap[title] = match;
+
+		// Create the match text with line number
+		matchEl.createEl("span", {
+			text: `[${String(match.line).padStart(3, "0")} / ${match.index}] `,
+			cls: "line-number",
+		});
+		matchEl.createEl("span", {
+			text: `${match.before} `,
+		});
+		match;
+		matchEl.createEl("span", {
+			text: `${match.match}`,
+			cls: "highlight",
+		});
+		matchEl.createEl("span", {
+			text: ` ${match.after}`,
+		});
+	}
+
 	onOpen() {
 		let { contentEl } = this;
 		contentEl.createEl("h2", { text: "Found Note Links" });
@@ -32,9 +121,8 @@ export class FindNoteLinksModal extends Modal {
 		// Create a "select all" checkbox
 		this.selectAllCheckbox = controlsContainer.createEl("input", {
 			type: "checkbox",
-			cls: "select-all-checkbox",
-			id: "select-all",
 		}) as HTMLInputElement;
+		this.selectAllCheckbox.id = "select-all-checkbox";
 
 		// Add event listener for "mark all" checkbox
 		this.selectAllCheckbox.onchange = () => {
@@ -54,10 +142,42 @@ export class FindNoteLinksModal extends Modal {
 			this.filterResults(target.value);
 		};
 
-		// Render each match
-		this.filteredResults.forEach((match, index) => {
-			this.renderMatch(contentEl, match, index);
+		// Create a div for the matches container
+		let matchesContainer = contentEl.createDiv({
+			cls: "matches-container",
 		});
+
+		// Apply margin to the matches container
+		matchesContainer.style.marginTop = "20px"; // Adjust the margin as needed
+		matchesContainer.style.height = "400px"; // Adjust the height as needed
+		matchesContainer.style.paddingRight = "10px"; // Adjust the height as needed
+		matchesContainer.style.overflow = "auto";
+
+		// Create a div for the matches
+		let matchesContent = matchesContainer.createDiv({
+			cls: "matches-content",
+		});
+
+		// Render the initial matches
+		this.filteredResults.forEach((match, index) => {
+			this.renderMatch(matchesContent, match, index);
+		});
+
+		// Create the "Link all 'n' notes!" button
+		let linkAllButton = this.createButton("Link all 'n' notes!", () => {
+			this.linkAllSelected();
+		});
+		linkAllButton.style.margin = "20px 0"; // Add margin to the button
+		contentEl.appendChild(linkAllButton);
+	}
+
+	createButton(text: string, onClick: () => void): HTMLButtonElement {
+		let button = document.createElement("button");
+		button.textContent = text;
+		button.style.width = "100%"; // Make the button full width
+		button.style.padding = "10px"; // Add padding for larger size
+		button.addEventListener("click", onClick);
+		return button;
 	}
 
 	toggleSelectAll() {
@@ -71,73 +191,27 @@ export class FindNoteLinksModal extends Modal {
 			checkbox.checked = checked;
 		});
 	}
-
 	filterResults(query: string) {
-		// Convert the query to lower case for case insensitive search
-		let lowerCaseQuery = query.toLowerCase();
+		// Convert the query to lower case for case-insensitive search
+		const lowerCaseQuery = query.toLowerCase();
 
 		// Filter the results based on the query
-		this.filteredResults = this.results.filter((match) => {
-			return match.match.toLowerCase().includes(lowerCaseQuery);
-		});
+		this.filteredResults = this.results.filter((match) =>
+			match.match.toLowerCase().includes(lowerCaseQuery)
+		);
+
+		// Clear the checkboxMatchMap
+		this.checkboxMatchMap = {};
 
 		// Re-render only the matches with the filtered results
-		let { contentEl } = this;
-		contentEl.querySelectorAll(".match-element").forEach((element) => {
-			element.remove();
-		});
+		const matchesContainer = this.contentEl.querySelector(
+			".matches-content"
+		) as HTMLElement;
+		matchesContainer.innerHTML = ""; // Clear previous matches
 
 		this.filteredResults.forEach((match, index) => {
-			this.renderMatch(contentEl, match, index);
+			this.renderMatch(matchesContainer, match, index);
 		});
-	}
-
-	private renderControls(containerEl: HTMLElement) {
-		// Create controls container with flex layout
-		let controlsContainer = containerEl.createDiv({
-			cls: "controls-container",
-		});
-
-		// Create a "select all" checkbox
-		let selectAllCheckbox = controlsContainer.createEl("input", {
-			type: "checkbox",
-			cls: "select-all-checkbox",
-			id: "select-all",
-		}) as HTMLInputElement;
-
-		// Create a search bar
-		let searchBar = controlsContainer.createEl("input", {
-			type: "text",
-			cls: "search-bar",
-			placeholder: "Search...",
-		}) as HTMLInputElement;
-
-		// Listen for input to filter results
-		searchBar.oninput = (event: Event) => {
-			let target = event.target as HTMLInputElement;
-			this.filterResults(target.value);
-		};
-	}
-
-	renderMatch(containerEl: HTMLElement, match: MatchResult, index: number) {
-		// Create a div for the entire match element
-		let matchEl = containerEl.createDiv({
-			cls: "match-element",
-		});
-
-		// Create a checkbox
-		let checkbox = matchEl.createEl("input", {
-			type: "checkbox",
-			cls: "match-checkbox",
-			id: `match-${index}`,
-		}) as HTMLInputElement;
-
-		// Create the match text
-		let label = matchEl.createEl("label", {
-			attr: { for: `match-${index}` },
-		});
-
-		label.innerHTML = `${match.before} <span class="highlight">${match.match}</span> ${match.after}`;
 	}
 
 	onClose() {

@@ -107,24 +107,60 @@ export default class ANLPlugin extends Plugin {
 
 		let matches: MatchResult[] = [];
 
-		// Go through the document line by line
 		for (let i = 0; i < doc.lineCount(); i++) {
 			const line = doc.getLine(i);
 
 			// Split the line into words
 			const words = line.split(/\s+/);
 
-			// Go through the words in the line
-			for (let j = 0; j < words.length; j++) {
-				// If the word matches a note name, capture the context and store the match
-				if (noteNames.includes(words[j])) {
-					matches.push({
-						match: words[j],
-						before: words.slice(Math.max(0, j - 3), j).join(" "),
-						after: words.slice(j + 1, j + 4).join(" "),
-					});
+			// Go through each note name
+			noteNames.forEach((noteName) => {
+				// Find the index of the first word of the note name in the words array
+				let index = words.indexOf(noteName.split(" ")[0]);
+
+				// While there is still a match in the line
+				while (index !== -1) {
+					// Determine the indexes of the three words before and after the match
+					const beforeStartIndex = Math.max(0, index - 1);
+					const afterEndIndex = Math.min(
+						words.length,
+						index + noteName.split(" ").length + 4
+					); // 4 is for three words after the match.
+
+					// Construct the before and after context
+					const beforeContext = words.slice(beforeStartIndex, index).join(" ");
+					const afterContext = words
+						.slice(index + noteName.split(" ").length, afterEndIndex)
+						.join(" ");
+
+					// Get the substring from the line that corresponds to the current match and its surrounding words
+					const matchSubstring = `${beforeContext} ${noteName} ${afterContext}`;
+
+					// Check if the note name is in the line and is not already enclosed within double square brackets in the match substring
+					if (line.includes(noteName)) {
+						// Get the position of note name in line
+						const notePosition = line.indexOf(noteName);
+
+						// Get the characters before and after the note name
+						const charBeforeNote = line[notePosition - 1];
+						const charAfterNote = line[notePosition + noteName.length];
+
+						// If the note name is not enclosed within double square brackets
+						if (!(charBeforeNote === "[" && charAfterNote === "]")) {
+							matches.push({
+								match: noteName,
+								before: beforeContext,
+								after: afterContext,
+								line: i + 1,
+								index: index,
+							});
+						}
+					}
+
+					// Find the next match in the words array
+					index = words.indexOf(noteName.split(" ")[0], index + 1);
 				}
-			}
+			});
 		}
 
 		if (matches.length > 0) {
