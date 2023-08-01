@@ -1,11 +1,11 @@
 {
 	"id": "auto-note-linker",
 	"name": "Auto Note Linker",
-	"version": "1.0.1",
+	"version": "1.1.1",
 	"minAppVersion": "0.15.0",
 	"description": "This scan a file to automaticallly create note links",
 	"author": "Wand",
-	"authorUrl": "",
-	"fundingUrl": "",
+	"authorUrl": "https://github.com/caio27joseph",
+	"fundingUrl": "https://github.com/caio27joseph/auto-note-linker",
 	"isDesktopOnly": false
 }
