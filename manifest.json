@@ -1,7 +1,7 @@
 {
 	"id": "auto-note-linker",
 	"name": "Auto Note Linker",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"minAppVersion": "0.15.0",
 	"description": "This scan a file to automaticallly create note links",
 	"author": "Wand",
