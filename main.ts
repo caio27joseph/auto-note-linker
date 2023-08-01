@@ -53,7 +53,6 @@ export default class ANLPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
-
 	findNoteMatches(view: MarkdownView) {
 		// Get all note names in the vault
 		const noteNames = this.app.vault
@@ -68,55 +67,56 @@ export default class ANLPlugin extends Plugin {
 		for (let i = 0; i < doc.lineCount(); i++) {
 			const line = doc.getLine(i);
 
-			// Split the line into words
-			const words = line.split(/\s+/);
-
 			// Go through each note name
 			noteNames.forEach((noteName) => {
-				// Find the index of the first word of the note name in the words array
-				let index = words.indexOf(noteName.split(" ")[0]);
+				// Skip the current note's basename to prevent self-links
+				if (noteName !== view.file.basename) {
+					// Find the index of the first word of the note name in the line
+					let index = line.indexOf(noteName);
 
-				// While there is still a match in the line
-				while (index !== -1) {
-					// Determine the indexes of the three words before and after the match
-					const beforeStartIndex = Math.max(0, index - 1);
-					const afterEndIndex = Math.min(
-						words.length,
-						index + noteName.split(" ").length + 4
-					); // 4 is for three words after the match.
+					// While there is still a match in the line
+					while (index !== -1) {
+						// Determine the indexes of the three words before and after the match
+						const beforeStartIndex = Math.max(0, index - 1);
+						const afterEndIndex = Math.min(
+							line.length,
+							index + noteName.length + 4
+						);
 
-					// Construct the before and after context
-					const beforeContext = words.slice(beforeStartIndex, index).join(" ");
-					const afterContext = words
-						.slice(index + noteName.split(" ").length, afterEndIndex)
-						.join(" ");
+						// Construct the before and after context
+						const beforeContext = line.substring(beforeStartIndex, index);
+						const afterContext = line.substring(
+							index + noteName.length,
+							afterEndIndex
+						);
 
-					// Get the substring from the line that corresponds to the current match and its surrounding words
-					const matchSubstring = `${beforeContext} ${noteName} ${afterContext}`;
+						// Get the substring from the line that corresponds to the current match and its surrounding words
+						const matchSubstring = `${beforeContext} ${noteName} ${afterContext}`;
 
-					// Check if the note name is in the line and is not already enclosed within double square brackets in the match substring
-					if (line.includes(noteName)) {
-						// Get the position of note name in line
-						const notePosition = line.indexOf(noteName);
+						// Check if the note name is in the line and is not already enclosed within double square brackets in the match substring
+						if (line.includes(noteName)) {
+							// Get the position of note name in line
+							const notePosition = line.indexOf(noteName);
 
-						// Get the characters before and after the note name
-						const charBeforeNote = line[notePosition - 1];
-						const charAfterNote = line[notePosition + noteName.length];
+							// Get the characters before and after the note name
+							const charBeforeNote = line[notePosition - 1];
+							const charAfterNote = line[notePosition + noteName.length];
 
-						// If the note name is not enclosed within double square brackets
-						if (!(charBeforeNote === "[" && charAfterNote === "]")) {
-							matches.push({
-								match: noteName,
-								before: beforeContext,
-								after: afterContext,
-								line: i + 1,
-								index: index,
-							});
+							// If the note name is not enclosed within double square brackets
+							if (!(charBeforeNote === "[" && charAfterNote === "]")) {
+								matches.push({
+									match: noteName,
+									before: beforeContext,
+									after: afterContext,
+									line: i + 1,
+									index: index,
+								});
+							}
 						}
-					}
 
-					// Find the next match in the words array
-					index = words.indexOf(noteName.split(" ")[0], index + 1);
+						// Find the next match in the line
+						index = line.indexOf(noteName, index + 1);
+					}
 				}
 			});
 		}
