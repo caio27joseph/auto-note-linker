@@ -27,7 +27,6 @@ export class FindNoteLinksModal extends Modal {
 		this.filteredResults = results;
 		this.checkboxMatchMap = {};
 	}
-
 	linkAllSelected() {
 		let { contentEl } = this;
 		let checkboxes = contentEl.querySelectorAll<HTMLInputElement>(

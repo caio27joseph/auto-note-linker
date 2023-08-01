@@ -39,50 +39,8 @@ export default class ANLPlugin extends Plugin {
 				}
 			},
 		});
-
-		this.injectStyles();
 	}
-	onunload() {
-		// ... your existing unload logic ...
-
-		this.removeStyles();
-	}
-	injectStyles() {
-		this.styleEl = document.createElement("style");
-		this.styleEl.innerHTML = `
-			.modal {
-				background-color: var(--background-primary);
-			}
-			.highlight {
-				font-weight: bold;
-				color: var(--text-accent);
-			}
-			.match-checkbox {
-				transform: scale(1.5);
-			}
-			.match-element {
-				margin-bottom: 10px;
-				padding: 20px;
-				background-color: var(--background-secondary);
-				border-radius: 5px;
-				padding-right: 20px; /* Add right padding to create space */
-			}
-			.controls-container {
-				display: flex;
-				align-items: center;
-				gap: 10px; /* or adjust the space as needed */
-			}
-			
-			.select-all-checkbox {
-					margin-right: auto;
-			}
-			
-			.search-bar {
-					flex-grow: 1;
-			}
-		`;
-		document.head.appendChild(this.styleEl);
-	}
+	onunload() {}
 
 	removeStyles() {
 		this.styleEl.remove();
